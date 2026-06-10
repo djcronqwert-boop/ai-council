@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Council</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0d0f; --surface: #16161a; --border: #2a2a32;
+    --text: #e8e8f0; --muted: #6b6b80;
+    --claude: #c084fc; --gpt: #34d399; --gemini: #60a5fa; --grok: #fb923c;
+    --consensus: #fbbf24; --error: #f87171;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-weight: 300; min-height: 100vh; }
+  header { padding: 1.5rem 1.25rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 1rem; }
+  header h1 { font-family: 'IBM Plex Mono', monospace; font-size: 1rem; font-weight: 600; }
+  header span { font-size: 0.7rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  .api-setup { margin: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; }
+  .api-setup summary { cursor: pointer; font-size: 0.78rem; font-family: 'IBM Plex Mono', monospace; color: var(--muted); user-select: none; }
+  .api-setup summary:hover { color: var(--text); }
+  .api-fields { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.9rem; }
+  .api-field label { display: block; font-size: 0.68rem; font-family: 'IBM Plex Mono', monospace; margin-bottom: 0.3rem; }
+  .api-field.claude label { color: var(--claude); }
+  .api-field.gpt label { color: var(--gpt); }
+  .api-field.gemini label { color: var(--gemini); }
+  .api-field.grok label { color: var(--grok); }
+  .api-field input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 0.45rem 0.7rem; color: var(--text); font-size: 0.78rem; font-family: 'IBM Plex Mono', monospace; outline: none; }
+  .api-field input:focus { border-color: var(--muted); }
+  .save-btn { margin-top: 0.75rem; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 0.45rem 1rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; cursor: pointer; }
+  .save-btn:hover { border-color: var(--muted); }
+  .saved-badge { font-size: 0.7rem; color: var(--gpt); font-family: 'IBM Plex Mono', monospace; margin-left: 0.75rem; display: none; }
+  .query-area { padding: 1rem; }
+  .query-box { display: flex; gap: 0.6rem; align-items: flex-end; }
+  textarea { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem 0.9rem; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.88rem; font-weight: 300; resize: none; outline: none; min-height: 52px; max-height: 160px; line-height: 1.5; }
+  textarea::placeholder { color: var(--muted); }
+  textarea:focus { border-color: var(--muted); }
+  button#askBtn { background: var(--text); color: var(--bg); border: none; border-radius: 8px; padding: 0.7rem 1.1rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  button#askBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .arena { padding: 0 1rem 3rem; display: none; flex-direction: column; gap: 1.25rem; }
+  .arena.visible { display: flex; }
+  .phase-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; padding: 0.4rem 0 0.2rem; border-top: 1px solid var(--border); }
+  .agents-grid { display: flex; flex-direction: column; gap: 0.75rem; }
+  .agent-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; min-height: 80px; }
+  .agent-card.claude { border-left: 3px solid var(--claude); }
+  .agent-card.gpt    { border-left: 3px solid var(--gpt); }
+  .agent-card.gemini { border-left: 3px solid var(--gemini); }
+  .agent-card.grok   { border-left: 3px solid var(--grok); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
+  .agent-card.active { animation: pulse 1.4s infinite; }
+  .agent-name { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; font-weight: 600; margin-bottom: 0.6rem; }
+  .agent-card.claude .agent-name { color: var(--claude); }
+  .agent-card.gpt    .agent-name { color: var(--gpt); }
+  .agent-card.gemini .agent-name { color: var(--gemini); }
+  .agent-card.grok   .agent-name { color: var(--grok); }
+  .agent-text { font-size: 0.8rem; line-height: 1.6; color: var(--text); white-space: pre-wrap; }
+  .agent-text.placeholder { color: var(--muted); font-style: italic; }
+  .discussion-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; }
+  .discussion-row { display: flex; gap: 0.6rem; margin-bottom: 0.85rem; }
+  .discussion-row:last-child { margin-bottom: 0; }
+  .disc-who { font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; font-weight: 600; min-width: 56px; padding-top: 2px; flex-shrink: 0; }
+  .disc-who.claude { color: var(--claude); }
+  .disc-who.gpt    { color: var(--gpt); }
+  .disc-who.gemini { color: var(--gemini); }
+  .disc-who.grok   { color: var(--grok); }
+  .disc-text { font-size: 0.8rem; line-height: 1.6; color: var(--text); }
+  .consensus-card { background: #1a180d; border: 1px solid #3d3510; border-left: 3px solid var(--consensus); border-radius: 10px; padding: 1.1rem 1.25rem; }
+  .consensus-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: var(--consensus); font-weight: 600; margin-bottom: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .consensus-text { font-size: 0.88rem; line-height: 1.7; color: var(--text); white-space: pre-wrap; }
+  .spinner { display: inline-block; width: 9px; height: 9px; border: 2px solid var(--border); border-top-color: var(--muted); border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 5px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .note { font-size: 0.7rem; color: var(--muted); margin-top: 0.5rem; font-family: 'IBM Plex Mono', monospace; }
+  .error-msg { font-size: 0.75rem; color: var(--error); font-family: 'IBM Plex Mono', monospace; margin-top: 0.4rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Council</h1>
+  <span>// 4 агента · дебат</span>
+</header>
+
+<details class="api-setup" id="apiSetup">
+  <summary>⚙ API-ключи</summary>
+  <div class="api-fields">
+    <div class="api-field claude">
+      <label>CLAUDE — встроен ✓</label>
+      <input type="text" value="Встроен автоматически" disabled style="opacity:0.4">
+    </div>
+    <div class="api-field gpt">
+      <label>OPENAI API KEY</label>
+      <input type="password" id="openaiKey" placeholder="sk-...">
+    </div>
+    <div class="api-field gemini">
+      <label>GOOGLE GEMINI API KEY</label>
+      <input type="password" id="geminiKey" placeholder="AIza...">
+    </div>
+    <div class="api-field grok">
+      <label>XAI (GROK) API KEY</label>
+      <input type="password" id="grokKey" placeholder="xai-...">
+    </div>
+  </div>
+  <button class="save-btn" onclick="saveKeys()">💾 Сохранить ключи</button>
+  <span class="saved-badge" id="savedBadge">✓ сохранено</span>
+  <p class="note">Ключи сохраняются в памяти браузера на этом устройстве.</p>
+</details>
+
+<div class="query-area">
+  <div class="query-box">
+    <textarea id="questionInput" placeholder="Задайте вопрос всем четырём ИИ..." rows="2"></textarea>
+    <button id="askBtn" onclick="runDebate()">Спросить →</button>
+  </div>
+  <div id="errorMsg" class="error-msg"></div>
+</div>
+
+<div class="arena" id="arena">
+  <div class="phase-label">① Независимые ответы</div>
+  <div class="agents-grid">
+    <div class="agent-card claude" id="card-claude">
+      <div class="agent-name">CLAUDE · Anthropic</div>
+      <div class="agent-text placeholder" id="text-claude">ожидание...</div>
+    </div>
+    <div class="agent-card gpt" id="card-gpt">
+      <div class="agent-name">GPT-4o · OpenAI</div>
+      <div class="agent-text placeholder" id="text-gpt">ожидание...</div>
+    </div>
+    <div class="agent-card gemini" id="card-gemini">
+      <div class="agent-name">Gemini · Google</div>
+      <div class="agent-text placeholder" id="text-gemini">ожидание...</div>
+    </div>
+    <div class="agent-card grok" id="card-grok">
+      <div class="agent-name">Grok · xAI</div>
+      <div class="agent-text placeholder" id="text-grok">ожидание...</div>
+    </div>
+  </div>
+
+  <div class="phase-label" id="phaseDiscuss" style="display:none">② Обсуждение агентов</div>
+  <div class="discussion-block" id="discussBlock" style="display:none"></div>
+
+  <div class="phase-label" id="phaseConsensus" style="display:none">③ Итоговый консенсус</div>
+  <div class="consensus-card" id="consensusCard" style="display:none">
+    <div class="consensus-label">▸ Общий ответ</div>
+    <div class="consensus-text" id="consensusText"></div>
+  </div>
+</div>
+
+<script>
+// Load saved keys
+window.addEventListener('load', () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('ai_council_keys') || '{}');
+    if (saved.openai) document.getElementById('openaiKey').value = saved.openai;
+    if (saved.gemini) document.getElementById('geminiKey').value = saved.gemini;
+    if (saved.grok)   document.getElementById('grokKey').value   = saved.grok;
+  } catch(e) {}
+});
+
+function saveKeys() {
+  try {
+    const keys = {
+      openai: document.getElementById('openaiKey').value.trim(),
+      gemini: document.getElementById('geminiKey').value.trim(),
+      grok:   document.getElementById('grokKey').value.trim()
+    };
+    localStorage.setItem('ai_council_keys', JSON.stringify(keys));
+    const badge = document.getElementById('savedBadge');
+    badge.style.display = 'inline';
+    setTimeout(() => badge.style.display = 'none', 2000);
+  } catch(e) { alert('Не удалось сохранить ключи'); }
+}
+
+function getKeys() {
+  return {
+    openai: document.getElementById('openaiKey').value.trim(),
+    gemini: document.getElementById('geminiKey').value.trim(),
+    grok:   document.getElementById('grokKey').value.trim()
+  };
+}
+
+function setCard(id, text) {
+  const el = document.getElementById('text-' + id);
+  el.textContent = text;
+  el.classList.remove('placeholder');
+  document.getElementById('card-' + id).classList.remove('active');
+}
+
+function setLoading(id, msg) {
+  const el = document.getElementById('text-' + id);
+  el.innerHTML = `<span class="spinner"></span>${msg}`;
+  el.classList.add('placeholder');
+  document.getElementById('card-' + id).classList.add('active');
+}
+
+async function callClaude(messages, system = "") {
+  const body = { model: "claude-sonnet-4-20250514", max_tokens: 1000, messages };
+  if (system) body.system = system;
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(c => c.text || "").join("");
+}
+
+async function callGPT(messages, apiKey) {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: "gpt-4o", max_tokens: 1000, messages })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.choices[0].message.content;
+}
+
+async function callGemini(prompt, apiKey) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.candidates[0].content.parts[0].text;
+}
+
+async function callGrok(messages, apiKey) {
+  const res = await fetch("https://api.x.ai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: "grok-3-latest", max_tokens: 1000, messages })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.choices[0].message.content;
+}
+
+async function runDebate() {
+  const question = document.getElementById('questionInput').value.trim();
+  if (!question) return;
+  const { openai, gemini: geminiKey, grok: grokKey } = getKeys();
+  document.getElementById('errorMsg').textContent = "";
+  const btn = document.getElementById('askBtn');
+  btn.disabled = true;
+  btn.textContent = "Идёт дебат...";
+  const arena = document.getElementById('arena');
+  arena.classList.add('visible');
+  ['phaseDiscuss','discussBlock','phaseConsensus','consensusCard'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+
+  setLoading('claude', 'анализирует...');
+  setLoading('gpt', 'анализирует...');
+  setLoading('gemini', 'анализирует...');
+  setLoading('grok', 'анализирует...');
+
+  const sysPrompt = "Ты участник мульти-агентного дебата. Дай чёткий, содержательный ответ на вопрос. Не упоминай других ИИ на этом этапе. Отвечай на русском.";
+
+  const [r1, r2, r3, r4] = await Promise.allSettled([
+    callClaude([{ role: "user", content: question }], sysPrompt),
+    openai ? callGPT([{ role: "system", content: sysPrompt }, { role: "user", content: question }], openai)
+           : Promise.reject(new Error("Нет ключа OpenAI")),
+    geminiKey ? callGemini(`${sysPrompt}\n\nВопрос: ${question}`, geminiKey)
+              : Promise.reject(new Error("Нет ключа Gemini")),
+    grokKey ? callGrok([{ role: "system", content: sysPrompt }, { role: "user", content: question }], grokKey)
+            : Promise.reject(new Error("Нет ключа xAI"))
+  ]);
+
+  const claudeA = r1.status === "fulfilled" ? r1.value : `⚠ ${r1.reason.message}`;
+  const gptA    = r2.status === "fulfilled" ? r2.value : `⚠ ${r2.reason.message}`;
+  const geminiA = r3.status === "fulfilled" ? r3.value : `⚠ ${r3.reason.message}`;
+  const grokA   = r4.status === "fulfilled" ? r4.value : `⚠ ${r4.reason.message}`;
+
+  setCard('claude', claudeA);
+  setCard('gpt', gptA);
+  setCard('gemini', geminiA);
+  setCard('grok', grokA);
+
+  // Phase 2
+  document.getElementById('phaseDiscuss').style.display = '';
+  document.getElementById('discussBlock').style.display = '';
+  const discBlock = document.getElementById('discussBlock');
+  discBlock.innerHTML = `<div style="color:var(--muted);font-size:0.78rem;font-family:'IBM Plex Mono',monospace"><span class="spinner"></span>агенты обсуждают...</div>`;
+
+  const discussPrompt = `Вопрос пользователя: "${question}"
+
+Ответы четырёх ИИ:
+— Claude: ${claudeA.substring(0, 500)}
+— GPT-4o: ${gptA.substring(0, 500)}
+— Gemini: ${geminiA.substring(0, 500)}
+— Grok: ${grokA.substring(0, 500)}
+
+Смоделируй короткое обсуждение между четырьмя агентами: что совпадает, что расходится, кто прав и почему. Каждую реплику начинай строго с "CLAUDE:", "GPT:", "GEMINI:" или "GROK:". Максимум 6 реплик. Отвечай на русском.`;
+
+  let discussion = "";
+  try {
+    discussion = await callClaude([{ role: "user", content: discussPrompt }],
+      "Ты модератор дебата четырёх ИИ. Смоделируй их обсуждение реалистично и содержательно.");
+  } catch(e) { discussion = "⚠ Не удалось сгенерировать обсуждение."; }
+
+  const lines = discussion.split('\n').filter(l => l.trim());
+  let html = "";
+  for (const line of lines) {
+    const who = line.startsWith("CLAUDE:") ? "claude"
+               : line.startsWith("GPT:") ? "gpt"
+               : line.startsWith("GEMINI:") ? "gemini"
+               : line.startsWith("GROK:") ? "grok"
+               : null;
+    if (who) {
+      const text = line.replace(/^(CLAUDE|GPT|GEMINI|GROK):/, "").trim();
+      html += `<div class="discussion-row"><span class="disc-who ${who}">${who.toUpperCase()}</span><span class="disc-text">${text}</span></div>`;
+    } else if (line.trim()) {
+      html += `<div class="discussion-row"><span class="disc-who"></span><span class="disc-text" style="color:var(--muted)">${line}</span></div>`;
+    }
+  }
+  discBlock.innerHTML = html || discussion;
+
+  // Phase 3
+  document.getElementById('phaseConsensus').style.display = '';
+  document.getElementById('consensusCard').style.display = '';
+  document.getElementById('consensusText').innerHTML = `<span class="spinner"></span>формулирую итог...`;
+
+  const consensusPrompt = `Вопрос: "${question}"
+
+Четыре ИИ дали ответы:
+Claude: ${claudeA.substring(0, 400)}
+GPT: ${gptA.substring(0, 400)}
+Gemini: ${geminiA.substring(0, 400)}
+Grok: ${grokA.substring(0, 400)}
+
+Обсуждение: ${discussion.substring(0, 700)}
+
+Сформулируй один финальный, максимально честный и точный ответ. Учти все точки зрения, отметь разногласия если они есть. Отвечай на русском. Будь конкретен.`;
+
+  let consensus = "";
+  try {
+    consensus = await callClaude([{ role: "user", content: consensusPrompt }],
+      "Ты синтезатор мнений нескольких ИИ. Дай максимально взвешенный финальный ответ.");
+  } catch(e) { consensus = "⚠ Не удалось сформировать консенсус."; }
+
+  document.getElementById('consensusText').textContent = consensus;
+  btn.disabled = false;
+  btn.textContent = "Спросить →";
+}
+
+document.getElementById('questionInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runDebate(); }
+});
+</script>
+</body>
+</html>
