@@ -106,14 +106,84 @@ function setCard(id, text) {
   el.classList.remove('placeholder');
 }
 
-async function runServerDebate() {
-  const prompt = document.getElementById('questionInput').value.trim();
-  const fileInput = document.getElementById('imageFile');
+async function runDebate() {
+  const question = document.getElementById('questionInput').value.trim();
+  if (!question) return;
+
+  // Твоя рабочая ссылка из Google Colab
+  const SERVER_URL = "https://9fb1-35-237-142-181.ngrok-free.app";
+
+  document.getElementById('errorMsg').textContent = "";
+  const btn = document.getElementById('askBtn');
+  btn.disabled = true;
+  btn.textContent = "Идёт дебат...";
   
-  if (!prompt || fileInput.files.length === 0) {
-    document.getElementById('errorMsg').textContent = "⚠ Введите текст и выберите скриншот!";
-    return;
+  const arena = document.getElementById('arena');
+  arena.classList.add('visible');
+  ['phaseDiscuss','discussBlock','phaseConsensus','consensusCard'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+
+  setLoading('claude', 'анализирует...');
+  setLoading('gpt', 'анализирует...');
+  setLoading('gemini', 'анализирует...');
+  setLoading('grok', 'анализирует...');
+
+  try {
+    // Отправляем текстовый запрос на сервер в Colab
+    const formData = new FormData();
+    formData.append('prompt', question);
+
+    const response = await fetch(`${SERVER_URL}/api/debate`, {
+      method: "POST",
+      body: formData
+    });
+    
+    if (!response.ok) throw new Error(`Ошибка сервера: ${response.status}`);
+    const data = await response.json();
+
+    // Заполняем карточки ответов моделей
+    setCard('claude', data.claude);
+    setCard('gpt', data.gpt);
+    setCard('gemini', data.gemini);
+    setCard('grok', data.grok);
+
+    // Отображаем ход дискуссии
+    document.getElementById('phaseDiscuss').style.display = '';
+    document.getElementById('discussBlock').style.display = '';
+    const discBlock = document.getElementById('discussBlock');
+    
+    const lines = data.discussion.split('\n').filter(l => l.trim());
+    let html = "";
+    for (const line of lines) {
+      const who = line.toUpperCase().startsWith("CLAUDE:") ? "claude"
+                 : line.toUpperCase().startsWith("GPT:") ? "gpt"
+                 : line.toUpperCase().startsWith("GEMINI:") ? "gemini"
+                 : line.toUpperCase().startsWith("GROK:") ? "grok"
+                 : null;
+      if (who) {
+        const text = line.replace(/^(CLAUDE|GPT|GEMINI|GROK):/i, "").trim();
+        html += `<div class="discussion-row"><span class="disc-who ${who}">${who.toUpperCase()}</span><span class="disc-text">${text}</span></div>`;
+      } else {
+        html += `<div class="discussion-row"><span class="disc-who"></span><span class="disc-text" style="color:var(--muted)">${line}</span></div>`;
+      }
+    }
+    discBlock.innerHTML = html || data.discussion;
+
+    // Отображаем финальный консенсус
+    document.getElementById('phaseConsensus').style.display = '';
+    document.getElementById('consensusCard').style.display = '';
+    document.getElementById('consensusText').textContent = data.final_consensus;
+
+  } catch (error) {
+    document.getElementById('errorMsg').textContent = `⚠ Ошибка связи: ${error.message}`;
+    ['claude', 'gpt', 'gemini', 'grok'].forEach(id => setCard(id, "Ошибка."));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Спросить →";
   }
+}
+
 
   document.getElementById('errorMsg').textContent = "";
   const btn = document.getElementById('askBtn');
